@@ -134,19 +134,34 @@ def _build_assets(tmp: Path, vendor_dir: Path, cornelius: Path, milo: Path) -> N
 # Playwright runner
 # ---------------------------------------------------------------------------
 
-def _run_benchmark(port: int, label: str, timeout: int = 300) -> dict:
-    """Open model_benchmark.html in headless Chromium and return the JSON report."""
+def _run_benchmark(port: int, label: str, timeout: int = 300,
+                   backend: str = "wasm") -> dict:
+    """Open model_benchmark.html in headless Chromium and return the JSON report.
+
+    backend: "wasm" | "webgpu" | "webnn"
+      webnn  — requires a real Chrome/Edge binary (not Playwright's bundled Chromium).
+               Set CHROME=/path/to/chrome or EDGE=/path/to/msedge and pass
+               --backend webnn.  On macOS/iOS the Neural Engine is used when
+               deviceType="npu"; on other platforms it falls back to GPU/CPU.
+    """
     from playwright.sync_api import sync_playwright  # noqa: PLC0415
 
-    url = f"http://127.0.0.1:{port}/model_benchmark.html?backend=wasm"
+    url = f"http://127.0.0.1:{port}/model_benchmark.html?backend={backend}"
+
+    chrome_path = os.environ.get("CHROME") or os.environ.get("EDGE")
+    launch_kwargs: dict = {
+        "args": [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--enable-features=WebMachineLearningNeuralNetwork",
+            "--enable-experimental-web-platform-features",
+        ],
+    }
+    if chrome_path:
+        launch_kwargs["executable_path"] = chrome_path
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-            ],
-        )
+        browser = pw.chromium.launch(**launch_kwargs)
         ctx  = browser.new_context()
         page = ctx.new_page()
 
@@ -243,6 +258,9 @@ def main() -> None:
              "Repeat for multiple sets. Default: bundled weights.",
     )
     parser.add_argument("--timeout", type=int, default=300, help="Per-run timeout in seconds (default 300)")
+    parser.add_argument("--backend", default="wasm", choices=["wasm", "webgpu", "webnn"],
+                        help="ORT execution provider to benchmark (default: wasm). "
+                             "webnn requires a real Chrome/Edge binary: set CHROME= or EDGE= env var.")
     args = parser.parse_args()
 
     # Default to bundled weights only
@@ -278,7 +296,8 @@ def main() -> None:
             _build_assets(tmp, vendor_dir, cornelius, milo)
             server, port = _start_server(tmp)
             try:
-                report = _run_benchmark(port, label, timeout=args.timeout)
+                report = _run_benchmark(port, label, timeout=args.timeout,
+                                    backend=args.backend)
             finally:
                 server.shutdown()
 

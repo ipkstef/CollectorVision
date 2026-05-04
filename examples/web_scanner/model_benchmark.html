@@ -54,7 +54,8 @@
 
       const BENCHMARK_ISSUE_URL = "https://github.com/HanClinto/CollectorVision/issues/16#issuecomment-new";
       const params = new URLSearchParams(location.search);
-      const backend = params.get("backend") === "webgpu" ? "webgpu" : "wasm";
+      const validBackends = ["webgpu", "webnn", "wasm"];
+      const backend = validBackends.includes(params.get("backend")) ? params.get("backend") : "wasm";
       const requestedThreads = 4;
       const maxWasmThreads = crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"
         ? Math.max(1, Math.min(requestedThreads, navigator.hardwareConcurrency || requestedThreads))
@@ -145,24 +146,31 @@
 
       async function configureBackend(threadCount) {
         ort.env.wasm.numThreads = threadCount;
-        if (backend !== "webgpu") {
-          return;
+        if (backend === "webgpu") {
+          if (!("gpu" in navigator)) {
+            throw new Error("WebGPU is unavailable on this browser/device.");
+          }
+          const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+          if (!adapter) {
+            throw new Error("No WebGPU adapter available.");
+          }
+          ort.env.webgpu.adapter = adapter;
+          ort.env.webgpu.forceFp16 = false;
+        } else if (backend === "webnn") {
+          if (!("ml" in navigator)) {
+            throw new Error("WebNN is unavailable on this browser/device. Use Chrome 113+ or Safari 16.4+.");
+          }
         }
-        if (!("gpu" in navigator)) {
-          throw new Error("WebGPU is unavailable on this browser/device.");
-        }
-        const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-        if (!adapter) {
-          throw new Error("No WebGPU adapter available.");
-        }
-        ort.env.webgpu.adapter = adapter;
-        ort.env.webgpu.forceFp16 = false;
       }
 
       async function benchmarkModel(model, threadCount) {
         statusEl.textContent = `Loading ${model.name} with ${threadCount} thread${threadCount === 1 ? "" : "s"}…`;
         const createStart = performance.now();
-        const session = await ort.InferenceSession.create(model.path, { executionProviders: [backend] });
+        // WebNN session options: prefer NPU (Neural Engine on Apple) then GPU then CPU
+        const epOptions = backend === "webnn"
+          ? [{ name: "webnn", deviceType: "npu" }, { name: "webnn", deviceType: "gpu" }, { name: "webnn", deviceType: "cpu" }]
+          : [backend];
+        const session = await ort.InferenceSession.create(model.path, { executionProviders: epOptions });
         const sessionCreateMs = performance.now() - createStart;
         const sizeMiB = await modelSizeMiB(model.path);
         const inputName = session.inputNames[0];
