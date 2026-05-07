@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGES_DIR = ROOT / "examples" / "images"
@@ -76,6 +77,66 @@ class QuickstartIntegrationTests(unittest.TestCase):
         )
         self.assertIn("Name      Scrying Glass", stdout)
         self.assertIn("Set       Urza's Destiny (UDS)", stdout)
+
+    def test_rotation_invariant_helper_chooses_strongest_orientation(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "quickstart_rot_invariant.py"),
+            run_name="collectorvision_quickstart_rot_invariant_test",
+        )
+        search_best_orientation = module["search_best_orientation"]
+
+        class FakeEmbedder:
+            def embed(self, images):
+                self.images = images
+                return ["upright_embedding", "rotated_embedding"]
+
+        class FakeCatalog:
+            def __init__(self) -> None:
+                self.embedder = FakeEmbedder()
+
+            def search(self, embedding, top_k: int):
+                if embedding == "upright_embedding":
+                    return [(0.70, "upright-card")]
+                return [(0.92, "rotated-card")]
+
+        catalog = FakeCatalog()
+        crop = Image.new("RGB", (3, 2))
+
+        result = search_best_orientation(catalog, crop, top_k=1)
+
+        self.assertEqual(result.label, "rotated_180")
+        self.assertEqual(result.best_card_id, "rotated-card")
+        self.assertEqual(result.best_score, 0.92)
+        self.assertEqual(len(catalog.embedder.images), 2)
+
+    def test_eval_accuracy_rot_invariant_search_chooses_strongest_orientation(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "eval_accuracy.py"),
+            run_name="collectorvision_eval_accuracy_test",
+        )
+        search_hits = module["search_hits"]
+
+        class FakeEmbedder:
+            def embed(self, images):
+                self.images = images
+                return ["upright_embedding", "rotated_embedding"]
+
+        class FakeCatalog:
+            def __init__(self) -> None:
+                self.embedder = FakeEmbedder()
+
+            def search(self, embedding, top_k: int):
+                if embedding == "upright_embedding":
+                    return [(0.70, "upright-card")]
+                return [(0.92, "rotated-card")]
+
+        catalog = FakeCatalog()
+        crop = Image.new("RGB", (3, 2))
+
+        hits = search_hits(catalog, crop, top_k=1, rot_invariant=True)
+
+        self.assertEqual(hits, ["rotated-card"])
+        self.assertEqual(len(catalog.embedder.images), 2)
 
 
 @pytest.mark.hf

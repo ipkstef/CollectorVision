@@ -10,6 +10,7 @@ from collector_vision.embedders import NeuralEmbedder
 from collector_vision.games import Embedding, Game
 from collector_vision.hfd import HFD
 from collector_vision.interfaces import DetectionResult
+from collector_vision.transforms import rotate_card_180
 
 try:
     __version__: str = version("collectorvision")
@@ -24,5 +25,6 @@ __all__ = [
     "HFD",
     "NeuralCornerDetector",
     "NeuralEmbedder",
+    "rotate_card_180",
     "__version__",
 ]

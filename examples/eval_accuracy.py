@@ -12,6 +12,7 @@ Usage
 -----
     python examples/eval_accuracy.py image.jpg --catalog hf://HanClinto/milo/scryfall-mtg
     python examples/eval_accuracy.py images/   --catalog hf://HanClinto/milo/scryfall-mtg
+    python examples/eval_accuracy.py images/   --catalog hf://HanClinto/milo/scryfall-mtg --rot-invariant
 """
 
 import argparse
@@ -26,6 +27,18 @@ import collector_vision as cvg
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
 
+def search_hits(catalog: cvg.Catalog, crop, top_k: int, rot_invariant: bool) -> list[str]:
+    """Return top card IDs, optionally trying upright and upside-down crops."""
+    crops = [crop]
+    if rot_invariant:
+        crops.append(cvg.rotate_card_180(crop))
+
+    embeddings = catalog.embedder.embed(crops)
+    searches = [catalog.search(embedding, top_k=top_k) for embedding in embeddings]
+    best_hits = max(searches, key=lambda hits: hits[0][0])
+    return [cid for _, cid in best_hits]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -38,6 +51,11 @@ def main() -> None:
         nargs="+",
         default=[1, 3, 5],
         help="One or more k values to report (default: 1 3 5)",
+    )
+    parser.add_argument(
+        "--rot-invariant",
+        action="store_true",
+        help="Try both the dewarped crop and a 180-degree rotated copy, keeping the stronger match.",
     )
     args = parser.parse_args()
 
@@ -68,8 +86,9 @@ def main() -> None:
             continue
         detected += 1
 
-        emb = catalog.embedder.embed([detection.dewarp(bgr)])[0]
-        hits = [cid for _, cid in catalog.search(emb, top_k=max_k)]
+        hits = search_hits(
+            catalog, detection.dewarp(bgr), top_k=max_k, rot_invariant=args.rot_invariant
+        )
 
         true_oracle = catalog.card_to_oracle.get(true_id)
         hit_oracles = [catalog.card_to_oracle.get(c) for c in hits]

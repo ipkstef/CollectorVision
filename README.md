@@ -109,6 +109,10 @@ for emb in embeddings:
 best_id = max(score_map, key=score_map.get)
 ```
 
+## Upside-down cards
+
+Current embeddings can be sensitive to 180-degree rotation. For a temporary rotation-invariant workaround, see [examples/quickstart_rot_invariant.py](examples/quickstart_rot_invariant.py), or pass `--rot-invariant` to [examples/eval_accuracy.py](examples/eval_accuracy.py). Both paths dewarp the card once, embed the crop and a 180-degree rotated copy, search both, and keep the orientation with the strongest top match.
+
 ---
 
 ## Pre-cropped images
