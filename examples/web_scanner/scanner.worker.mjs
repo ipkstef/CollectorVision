@@ -173,7 +173,15 @@ function computeHomography(srcPoints, dstPoints) {
   return [h11, h12, h13, h21, h22, h23, h31, h32, 1];
 }
 
-function writeBilinearPixel(src, width, height, x, y, dst, offset) {
+function applyHomography(matrix, x, y) {
+  const denom = matrix[6] * x + matrix[7] * y + matrix[8];
+  return [
+    (matrix[0] * x + matrix[1] * y + matrix[2]) / denom,
+    (matrix[3] * x + matrix[4] * y + matrix[5]) / denom,
+  ];
+}
+
+function sampleBilinear(data, width, height, x, y, channel) {
   const clampedX = Math.min(Math.max(x, 0), width - 1);
   const clampedY = Math.min(Math.max(y, 0), height - 1);
   const x0 = Math.floor(clampedX);
@@ -183,21 +191,14 @@ function writeBilinearPixel(src, width, height, x, y, dst, offset) {
   const tx = clampedX - x0;
   const ty = clampedY - y0;
 
-  const topWeight = 1 - ty;
-  const bottomWeight = ty;
-  const leftWeight = 1 - tx;
-  const rightWeight = tx;
-  const i00 = (y0 * width + x0) * 4;
-  const i10 = (y0 * width + x1) * 4;
-  const i01 = (y1 * width + x0) * 4;
-  const i11 = (y1 * width + x1) * 4;
+  const i00 = (y0 * width + x0) * 4 + channel;
+  const i10 = (y0 * width + x1) * 4 + channel;
+  const i01 = (y1 * width + x0) * 4 + channel;
+  const i11 = (y1 * width + x1) * 4 + channel;
 
-  for (let channel = 0; channel < 3; channel += 1) {
-    const top = src[i00 + channel] * leftWeight + src[i10 + channel] * rightWeight;
-    const bottom = src[i01 + channel] * leftWeight + src[i11 + channel] * rightWeight;
-    dst[offset + channel] = top * topWeight + bottom * bottomWeight;
-  }
-  dst[offset + 3] = 255;
+  const top = data[i00] * (1 - tx) + data[i10] * tx;
+  const bottom = data[i01] * (1 - tx) + data[i11] * tx;
+  return top * (1 - ty) + bottom * ty;
 }
 
 function normalizeEmbedding(embedding) {
@@ -633,18 +634,16 @@ class WorkerRuntime {
     const t1 = performance.now();
     const srcData = frameCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, width, height);
     const dstData = this.dewarpImageData;
-    const srcPixels = srcData.data;
-    const dstPixels = dstData.data;
-    const [h11, h12, h13, h21, h22, h23, h31, h32, h33] = inverse;
     const t2 = performance.now();
 
     for (let y = 0; y < DEWARP_H; y += 1) {
       for (let x = 0; x < DEWARP_W; x += 1) {
-        const denom = h31 * x + h32 * y + h33;
-        const sx = (h11 * x + h12 * y + h13) / denom;
-        const sy = (h21 * x + h22 * y + h23) / denom;
+        const [sx, sy] = applyHomography(inverse, x, y);
         const offset = (y * DEWARP_W + x) * 4;
-        writeBilinearPixel(srcPixels, width, height, sx, sy, dstPixels, offset);
+        dstData.data[offset] = sampleBilinear(srcData.data, width, height, sx, sy, 0);
+        dstData.data[offset + 1] = sampleBilinear(srcData.data, width, height, sx, sy, 1);
+        dstData.data[offset + 2] = sampleBilinear(srcData.data, width, height, sx, sy, 2);
+        dstData.data[offset + 3] = 255;
       }
     }
 
