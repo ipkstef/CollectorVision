@@ -16,6 +16,7 @@ Usage
 
 All paths are relative to the repo root unless absolute.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,9 +33,9 @@ import time
 import urllib.request
 from pathlib import Path
 
-ROOT     = Path(__file__).resolve().parents[1]
-WEB_DIR  = ROOT / "examples" / "web_scanner"
-WEIGHTS  = ROOT / "collector_vision" / "weights"
+ROOT = Path(__file__).resolve().parents[1]
+WEB_DIR = ROOT / "examples" / "web_scanner"
+WEIGHTS = ROOT / "collector_vision" / "weights"
 ORT_VERSION = "1.24.3"
 ORT_TARBALL = f"https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-{ORT_VERSION}.tgz"
 ORT_MEMBERS = [
@@ -47,6 +48,7 @@ ORT_MEMBERS = [
 # ---------------------------------------------------------------------------
 # COOP/COEP-aware HTTP server (required for SharedArrayBuffer / multi-thread)
 # ---------------------------------------------------------------------------
+
 
 class _COEPHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
@@ -83,6 +85,7 @@ def _start_server(directory: Path) -> tuple[http.server.HTTPServer, int]:
 # ORT vendor download
 # ---------------------------------------------------------------------------
 
+
 def _ensure_ort(vendor_dir: Path) -> None:
     """Download ORT WASM runtime files from npm if not already present."""
     target = vendor_dir / "onnxruntime-web"
@@ -99,8 +102,8 @@ def _ensure_ort(vendor_dir: Path) -> None:
     with tarfile.open(fileobj=__import__("io").BytesIO(data), mode="r:gz") as tf:
         for member_name in ORT_MEMBERS:
             member = tf.getmember(member_name)
-            src    = tf.extractfile(member)
-            dest   = target / Path(member_name).name
+            src = tf.extractfile(member)
+            dest = target / Path(member_name).name
             dest.write_bytes(src.read())
             print(f"   {dest.name}  ({dest.stat().st_size // 1024} KB)")
 
@@ -108,6 +111,7 @@ def _ensure_ort(vendor_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 # Minimal assets directory for the benchmark page
 # ---------------------------------------------------------------------------
+
 
 def _build_assets(tmp: Path, vendor_dir: Path, cornelius: Path, milo: Path) -> None:
     """Assemble the minimal directory that model_benchmark.html needs."""
@@ -122,7 +126,7 @@ def _build_assets(tmp: Path, vendor_dir: Path, cornelius: Path, milo: Path) -> N
     models_dst = tmp / "assets" / "models"
     models_dst.mkdir(parents=True)
     shutil.copy2(cornelius, models_dst / "cornelius.onnx")
-    shutil.copy2(milo,      models_dst / "milo.onnx")
+    shutil.copy2(milo, models_dst / "milo.onnx")
 
     # Benchmark HTML (reference the original; serve from a copy to avoid path issues)
     shutil.copy2(WEB_DIR / "model_benchmark.html", tmp / "model_benchmark.html")
@@ -134,8 +138,8 @@ def _build_assets(tmp: Path, vendor_dir: Path, cornelius: Path, milo: Path) -> N
 # Playwright runner
 # ---------------------------------------------------------------------------
 
-def _run_benchmark(port: int, label: str, timeout: int = 300,
-                   backend: str = "wasm") -> dict:
+
+def _run_benchmark(port: int, label: str, timeout: int = 300, backend: str = "wasm") -> dict:
     """Open model_benchmark.html in headless Chromium and return the JSON report.
 
     backend: "wasm" | "webgpu" | "webnn"
@@ -162,12 +166,18 @@ def _run_benchmark(port: int, label: str, timeout: int = 300,
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(**launch_kwargs)
-        ctx  = browser.new_context()
+        ctx = browser.new_context()
         page = ctx.new_page()
 
         # Forward browser console messages so JS errors are visible
-        page.on("console", lambda msg: print(f"   [{label}] console.{msg.type}: {msg.text[:200]}", flush=True)
-                if msg.type in ("error", "warning") else None)
+        page.on(
+            "console",
+            lambda msg: (
+                print(f"   [{label}] console.{msg.type}: {msg.text[:200]}", flush=True)
+                if msg.type in ("error", "warning")
+                else None
+            ),
+        )
         page.on("pageerror", lambda err: print(f"   [{label}] pageerror: {err}", flush=True))
 
         print(f"   [{label}] navigating to benchmark…", flush=True)
@@ -187,7 +197,9 @@ def _run_benchmark(port: int, label: str, timeout: int = 300,
         else:
             # Print page content to help diagnose
             final = page.evaluate("document.getElementById('status')?.textContent || 'no status'")
-            raise TimeoutError(f"Benchmark did not finish within {timeout}s (last status: {final!r})")
+            raise TimeoutError(
+                f"Benchmark did not finish within {timeout}s (last status: {final!r})"
+            )
 
         # Extract the JSON from inside the textarea (markdown report)
         markdown = page.evaluate("document.getElementById('comment')?.value || ''")
@@ -195,7 +207,7 @@ def _run_benchmark(port: int, label: str, timeout: int = 300,
 
     # Parse the embedded JSON from the markdown report
     start = markdown.find("```json")
-    end   = markdown.find("```", start + 7)
+    end = markdown.find("```", start + 7)
     if start == -1 or end == -1:
         raise ValueError("Could not find JSON block in benchmark report")
     return json.loads(markdown[start + 7 : end].strip())
@@ -205,11 +217,14 @@ def _run_benchmark(port: int, label: str, timeout: int = 300,
 # Formatting
 # ---------------------------------------------------------------------------
 
+
 def _print_results(label: str, report: dict) -> None:
     ua = report.get("userAgent", "")
     iso = report.get("crossOriginIsolated", False)
-    print(f"\n  {'Model':<12} {'Threads':>7} {'Mean ms':>9} {'P90 ms':>9} {'First ms':>10} {'Size MiB':>10}")
-    print(f"  {'-'*12} {'-'*7} {'-'*9} {'-'*9} {'-'*10} {'-'*10}")
+    print(
+        f"\n  {'Model':<12} {'Threads':>7} {'Mean ms':>9} {'P90 ms':>9} {'First ms':>10} {'Size MiB':>10}"
+    )
+    print(f"  {'-' * 12} {'-' * 7} {'-' * 9} {'-' * 9} {'-' * 10} {'-' * 10}")
     for b in report.get("benchmarks", []):
         s = b["latencyMs"]
         size = f"{b['sizeMiB']:.2f}" if b.get("sizeMiB") else "—"
@@ -225,21 +240,20 @@ def _compare(results: list[tuple[str, dict]]) -> None:
     if len(results) < 2:
         return
     print("\n── Δ vs baseline ─────────────────────────────────────────")
-    base_by_key = {
-        (b["name"], b["threads"]): b
-        for b in results[0][1].get("benchmarks", [])
-    }
+    base_by_key = {(b["name"], b["threads"]): b for b in results[0][1].get("benchmarks", [])}
     for label, report in results[1:]:
         print(f"\n  {label} vs {results[0][0]}:")
         for b in report.get("benchmarks", []):
-            key  = (b["name"], b["threads"])
+            key = (b["name"], b["threads"])
             base = base_by_key.get(key)
             if not base:
                 continue
             delta_mean = b["latencyMs"]["mean"] - base["latencyMs"]["mean"]
-            pct        = 100 * delta_mean / base["latencyMs"]["mean"]
-            sign       = "+" if delta_mean >= 0 else ""
-            bar        = "▲ SLOWER" if delta_mean > 0.5 else ("▼ faster" if delta_mean < -0.5 else "≈ same")
+            pct = 100 * delta_mean / base["latencyMs"]["mean"]
+            sign = "+" if delta_mean >= 0 else ""
+            bar = (
+                "▲ SLOWER" if delta_mean > 0.5 else ("▼ faster" if delta_mean < -0.5 else "≈ same")
+            )
             print(
                 f"  {b['name']:<12} {b['threads']:>2}t  "
                 f"{sign}{delta_mean:+.1f} ms  ({sign}{pct:.1f}%)  {bar}"
@@ -250,17 +264,29 @@ def _compare(results: list[tuple[str, dict]]) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run model_benchmark.html headlessly and compare results")
-    parser.add_argument(
-        "--set", dest="sets", metavar="LABEL:CORNELIUS:MILO", action="append",
-        help="Model set: label, cornelius.onnx path, milo.onnx path (colon-separated). "
-             "Repeat for multiple sets. Default: bundled weights.",
+    parser = argparse.ArgumentParser(
+        description="Run model_benchmark.html headlessly and compare results"
     )
-    parser.add_argument("--timeout", type=int, default=300, help="Per-run timeout in seconds (default 300)")
-    parser.add_argument("--backend", default="wasm", choices=["wasm", "webgpu", "webnn"],
-                        help="ORT execution provider to benchmark (default: wasm). "
-                             "webnn requires a real Chrome/Edge binary: set CHROME= or EDGE= env var.")
+    parser.add_argument(
+        "--set",
+        dest="sets",
+        metavar="LABEL:CORNELIUS:MILO",
+        action="append",
+        help="Model set: label, cornelius.onnx path, milo.onnx path (colon-separated). "
+        "Repeat for multiple sets. Default: bundled weights.",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=300, help="Per-run timeout in seconds (default 300)"
+    )
+    parser.add_argument(
+        "--backend",
+        default="wasm",
+        choices=["wasm", "webgpu", "webnn"],
+        help="ORT execution provider to benchmark (default: wasm). "
+        "webnn requires a real Chrome/Edge binary: set CHROME= or EDGE= env var.",
+    )
     args = parser.parse_args()
 
     # Default to bundled weights only
@@ -296,8 +322,7 @@ def main() -> None:
             _build_assets(tmp, vendor_dir, cornelius, milo)
             server, port = _start_server(tmp)
             try:
-                report = _run_benchmark(port, label, timeout=args.timeout,
-                                    backend=args.backend)
+                report = _run_benchmark(port, label, timeout=args.timeout, backend=args.backend)
             finally:
                 server.shutdown()
 

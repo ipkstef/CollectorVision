@@ -52,7 +52,9 @@ def catalog_stem(embedder: str, game: str, catalog_date: str) -> str:
 
 def iter_images(image_root: Path) -> list[Path]:
     return sorted(
-        path for path in image_root.rglob("*") if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        path
+        for path in image_root.rglob("*")
+        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
     )
 
 
@@ -129,7 +131,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    output_path = args.image_dir.parent / f"{catalog_stem(args.embedder, args.game, args.catalog_date)}.npz"
+    output_path = (
+        args.image_dir.parent / f"{catalog_stem(args.embedder, args.game, args.catalog_date)}.npz"
+    )
     metadata_path = output_path.with_suffix(".metadata.jsonl")
     build_catalog(
         args.image_dir,

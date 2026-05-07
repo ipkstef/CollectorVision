@@ -76,12 +76,8 @@ from PIL import Image
 
 SOURCE_REPO = "swccgpc/swccg-card-json"
 SOURCE_BRANCH = "main"
-HOLOTABLE_API_BASE = (
-    "https://api.github.com/repos/swccgpc/holotable/contents/Images-HT/starwars"
-)
-HOLOTABLE_RAW_BASE = (
-    "https://raw.githubusercontent.com/swccgpc/holotable/master/Images-HT/starwars"
-)
+HOLOTABLE_API_BASE = "https://api.github.com/repos/swccgpc/holotable/contents/Images-HT/starwars"
+HOLOTABLE_RAW_BASE = "https://raw.githubusercontent.com/swccgpc/holotable/master/Images-HT/starwars"
 
 CURRENT_CARD_FILES = ("Light.json", "Dark.json")
 VIRTUAL_SET_MIN = 200
@@ -285,7 +281,9 @@ def normalize_records(
 ) -> list[CardRecord]:
     source_cache_dir = cache_dir / "source" / safe_cache_name(source_ref)
     source_base = source_base_url(source_ref)
-    sets_data = read_or_fetch_json(source_cache_dir / "sets.json", f"{source_base}/sets.json", fetcher)
+    sets_data = read_or_fetch_json(
+        source_cache_dir / "sets.json", f"{source_base}/sets.json", fetcher
+    )
     sets_by_id = {str(item["id"]): item for item in sets_data}
     records: list[CardRecord] = []
 
@@ -311,7 +309,9 @@ def normalize_records(
                     continue
 
                 source_id = int(card["id"])
-                preferred_url, preferred_kind = preferred_image_url(image_url, cache_dir, fetcher, no_hires)
+                preferred_url, preferred_kind = preferred_image_url(
+                    image_url, cache_dir, fetcher, no_hires
+                )
                 set_name = str(set_info.get("name", set_id))
                 set_abbr = str(set_info.get("abbr", ""))
                 swccg_id = make_swccg_id(set_abbr, source_id, face, preferred_url)
@@ -398,7 +398,9 @@ def download_image(record: CardRecord, fetcher: ThrottledFetcher, force: bool) -
     return True
 
 
-def download_images(records: list[CardRecord], fetcher: ThrottledFetcher, force: bool) -> tuple[int, int]:
+def download_images(
+    records: list[CardRecord], fetcher: ThrottledFetcher, force: bool
+) -> tuple[int, int]:
     downloaded = 0
     cached = 0
     for record in records:
@@ -420,7 +422,9 @@ def parse_args() -> argparse.Namespace:
         help="swccg-card-json ref to fetch, preferably a commit SHA for reproducible builds",
     )
     parser.add_argument("--limit", type=int, default=0, help="Limit records for a proof run")
-    parser.add_argument("--throttle", type=float, default=0.25, help="Seconds between network requests")
+    parser.add_argument(
+        "--throttle", type=float, default=0.25, help="Seconds between network requests"
+    )
     parser.add_argument("--force-download", action="store_true")
     parser.add_argument("--no-hires", action="store_true", help="Skip Holotable hires discovery")
     return parser.parse_args()
@@ -434,9 +438,7 @@ def main() -> None:
     metadata_path = out_dir / "metadata.jsonl"
 
     fetcher = ThrottledFetcher(args.throttle)
-    records = normalize_records(
-        cache_dir, images_dir, fetcher, args.no_hires, args.source_ref
-    )
+    records = normalize_records(cache_dir, images_dir, fetcher, args.no_hires, args.source_ref)
     if args.limit > 0:
         records = records[: args.limit]
 
