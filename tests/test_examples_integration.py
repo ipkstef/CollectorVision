@@ -3,11 +3,13 @@ import io
 import json
 import re
 import runpy
+import tempfile
 import unittest
 import urllib.request
 from pathlib import Path
 from unittest import mock
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -137,6 +139,105 @@ class QuickstartIntegrationTests(unittest.TestCase):
 
         self.assertEqual(hits, ["rotated-card"])
         self.assertEqual(len(catalog.embedder.images), 2)
+
+    def test_eval_accuracy_rotation_invariance_defaults_on_with_opt_out(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "eval_accuracy.py"),
+            run_name="collectorvision_eval_accuracy_parser_test",
+        )
+        parser = module["build_parser"]()
+
+        default_args = parser.parse_args(["images", "--catalog", "catalog.npz"])
+        opt_out_args = parser.parse_args(
+            ["images", "--catalog", "catalog.npz", "--no-rot-invariant"]
+        )
+        verbose_args = parser.parse_args(["images", "--catalog", "catalog.npz", "--verbose"])
+        debug_args = parser.parse_args(["images", "--catalog", "catalog.npz", "--debug"])
+
+        self.assertTrue(default_args.rot_invariant)
+        self.assertFalse(default_args.verbose)
+        self.assertFalse(default_args.debug)
+        self.assertFalse(opt_out_args.rot_invariant)
+        self.assertTrue(verbose_args.verbose)
+        self.assertTrue(debug_args.debug)
+        self.assertEqual(debug_args.debug_dir, Path("eval_accuracy_debug"))
+
+    def test_eval_accuracy_discovers_supported_image_formats(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "eval_accuracy.py"),
+            run_name="collectorvision_eval_accuracy_image_paths_test",
+        )
+        files = [
+            Path("one.JPG"),
+            Path("two.jpeg"),
+            Path("three.PNG"),
+            Path("four.webp"),
+            Path("notes.txt"),
+        ]
+
+        with mock.patch.object(Path, "is_dir", return_value=True), mock.patch.object(
+            Path, "iterdir", return_value=iter(files)
+        ):
+            paths = module["image_paths"](Path("images"))
+
+        self.assertEqual(paths, sorted(files[:4]))
+
+    def test_eval_accuracy_verbose_prints_expected_and_matched_names(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "eval_accuracy.py"),
+            run_name="collectorvision_eval_accuracy_verbose_test",
+        )
+
+        cards = {
+            "expected-id": {"name": "Scrying Glass", "set_name": "Urza's Destiny", "set": "uds"},
+            "matched-id": {"name": "Sol Ring", "set_name": "Commander", "set": "cmd"},
+        }
+
+        def fake_fetch(card_id, cache):
+            cache[card_id] = cards[card_id]
+            return cache[card_id]
+
+        output = io.StringIO()
+        with mock.patch.dict(
+            module["print_verbose_result"].__globals__, {"fetch_scryfall_card": fake_fetch}
+        ), contextlib.redirect_stdout(output):
+            module["print_verbose_result"](
+                Path("expected-id_sample.jpg"), "expected-id", "matched-id", {}
+            )
+
+        self.assertIn("expected-id_sample.jpg", output.getvalue())
+        self.assertIn("expected  Scrying Glass / Urza's Destiny (UDS)", output.getvalue())
+        self.assertIn("matched   Sol Ring / Commander (CMD)", output.getvalue())
+
+    def test_eval_accuracy_debug_saves_overlay_and_aligned_crop(self) -> None:
+        module = runpy.run_path(
+            str(ROOT / "examples" / "eval_accuracy.py"),
+            run_name="collectorvision_eval_accuracy_debug_test",
+        )
+
+        class FakeDetection:
+            corners = np.array(
+                [[0.1, 0.1], [0.8, 0.1], [0.8, 0.8], [0.1, 0.8]], dtype=np.float32
+            )
+            card_present = True
+            confidence = 0.91
+            sharpness = 0.06
+            extra = {"presence": 0.99}
+
+            def dewarp(self, bgr):
+                return Image.new("RGB", (8, 8), "white")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            debug_dir = Path(tmp)
+            module["save_debug_artifacts"](
+                Path("sample-card.jpg"),
+                np.zeros((32, 32, 3), dtype=np.uint8),
+                FakeDetection(),
+                debug_dir,
+            )
+
+            self.assertTrue((debug_dir / "overlays" / "sample-card_corners.jpg").exists())
+            self.assertTrue((debug_dir / "aligned" / "sample-card_aligned.png").exists())
 
 
 @pytest.mark.hf

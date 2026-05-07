@@ -111,7 +111,7 @@ best_id = max(score_map, key=score_map.get)
 
 ## Upside-down cards
 
-Current embeddings can be sensitive to 180-degree rotation. For a temporary rotation-invariant workaround, see [examples/quickstart_rot_invariant.py](examples/quickstart_rot_invariant.py), or pass `--rot-invariant` to [examples/eval_accuracy.py](examples/eval_accuracy.py). Both paths dewarp the card once, embed the crop and a 180-degree rotated copy, search both, and keep the orientation with the strongest top match.
+Current embeddings can be sensitive to 180-degree rotation. For a temporary rotation-invariant workaround, see [examples/quickstart_rot_invariant.py](examples/quickstart_rot_invariant.py). [examples/eval_accuracy.py](examples/eval_accuracy.py) uses this workaround by default; pass `--no-rot-invariant` to measure upright-only accuracy, `--verbose` to print the expected and matched card name / set for each image, or `--debug` to save aligned crops and corner-detector overlays. Both rotation-invariant paths dewarp the card once, embed the crop and a 180-degree rotated copy, search both, and keep the orientation with the strongest top match.
 
 ---
 
