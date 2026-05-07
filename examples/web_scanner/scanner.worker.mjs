@@ -41,7 +41,23 @@ function sigmoid(x) {
   return 1 / (1 + Math.exp(-x));
 }
 
-function orderCorners(points) {
+function orientShortestEdgeTop(corners, width, height) {
+  const edgeLengths = corners.map(([x1, y1], index) => {
+    const [x2, y2] = corners[(index + 1) % corners.length];
+    const dx = (x1 - x2) * width;
+    const dy = (y1 - y2) * height;
+    return Math.hypot(dx, dy);
+  });
+  let shortestEdge = 0;
+  for (let i = 1; i < edgeLengths.length; i += 1) {
+    if (edgeLengths[i] < edgeLengths[shortestEdge]) {
+      shortestEdge = i;
+    }
+  }
+  return corners.map((_, index) => corners[(index + shortestEdge) % corners.length]);
+}
+
+function orderCorners(points, width = null, height = null) {
   const cx = points.reduce((sum, [x]) => sum + x, 0) / points.length;
   const cy = points.reduce((sum, [, y]) => sum + y, 0) / points.length;
   const sorted = [...points].sort(
@@ -66,10 +82,10 @@ function orderCorners(points) {
     const [x2, y2] = ordered[(i + 1) % ordered.length];
     return sum + (x1 * y2 - x2 * y1);
   }, 0);
-  if (signedArea < 0) {
-    return [ordered[0], ordered[3], ordered[2], ordered[1]];
-  }
-  return ordered;
+  const canonical = signedArea < 0
+    ? [ordered[0], ordered[3], ordered[2], ordered[1]]
+    : ordered;
+  return width && height ? orientShortestEdgeTop(canonical, width, height) : canonical;
 }
 
 function quadArea(corners) {
@@ -588,7 +604,7 @@ class WorkerRuntime {
     const t4 = performance.now();
 
     return {
-      corners: orderCorners(points),
+      corners: orderCorners(points, vw, vh),
       sharpness,
       confidence: sharpness ?? sigmoid(presenceLogit),
       cardPresent: (sharpness ?? sigmoid(presenceLogit)) >= MIN_SHARPNESS,

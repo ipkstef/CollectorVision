@@ -81,7 +81,21 @@ function fillInputTensor(rgbaData, size) {
   return tensor;
 }
 
-function orderCorners(points) {
+function orientShortestEdgeTop(corners, width, height) {
+  const edgeLengths = corners.map(([x1, y1], index) => {
+    const [x2, y2] = corners[(index + 1) % corners.length];
+    const dx = (x1 - x2) * width;
+    const dy = (y1 - y2) * height;
+    return Math.hypot(dx, dy);
+  });
+  let shortestEdge = 0;
+  for (let i = 1; i < edgeLengths.length; i += 1) {
+    if (edgeLengths[i] < edgeLengths[shortestEdge]) shortestEdge = i;
+  }
+  return corners.map((_, index) => corners[(index + shortestEdge) % corners.length]);
+}
+
+function orderCorners(points, width = null, height = null) {
   const cx = points.reduce((s, [x]) => s + x, 0) / points.length;
   const cy = points.reduce((s, [, y]) => s + y, 0) / points.length;
   const sorted = [...points].sort(
@@ -98,9 +112,10 @@ function orderCorners(points) {
     const [x2, y2] = ordered[(i + 1) % 4];
     return sum + (x1 * y2 - x2 * y1);
   }, 0);
-  return signedArea < 0
+  const canonical = signedArea < 0
     ? [ordered[0], ordered[3], ordered[2], ordered[1]]
     : ordered;
+  return width && height ? orientShortestEdgeTop(canonical, width, height) : canonical;
 }
 
 function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
@@ -218,7 +233,11 @@ async function runDetector(imgCanvas) {
     points.push([Math.min(Math.max(cornersRaw[i], 0), 1), Math.min(Math.max(cornersRaw[i + 1], 0), 1)]);
 
   const confidence = sharpness ?? sigmoid(presenceLogit);
-  return { corners: orderCorners(points), sharpness, cardPresent: confidence >= MIN_SHARPNESS };
+  return {
+    corners: orderCorners(points, imgCanvas.width, imgCanvas.height),
+    sharpness,
+    cardPresent: confidence >= MIN_SHARPNESS,
+  };
 }
 
 async function runEmbedder(dewarpCanvas) {
@@ -274,6 +293,43 @@ await test('dewarp and embed produce a valid embedding', async () => {
   for (const v of emb) norm += v * v;
   assert(Math.abs(Math.sqrt(norm) - 1.0) < 1e-4,
     `Embedding not L2-normalised: norm=${Math.sqrt(norm).toFixed(6)}`);
+});
+
+// ---------------------------------------------------------------------------
+// orderCorners regression tests
+// ---------------------------------------------------------------------------
+
+console.log('\norderCorners');
+
+function assertCornersClose(actual, expected, label) {
+  assert(actual.length === expected.length, `${label}: corner count mismatch`);
+  for (let i = 0; i < expected.length; i += 1) {
+    assert(
+      Math.abs(actual[i][0] - expected[i][0]) < 1e-6
+        && Math.abs(actual[i][1] - expected[i][1]) < 1e-6,
+      `${label}: corner ${i} expected [${expected[i]}], got [${actual[i]}]`,
+    );
+  }
+}
+
+await test('uses original image space when choosing shortest top edge', () => {
+  const corners = [[0.4, 0.2], [0.6, 0.2], [0.6, 0.8], [0.4, 0.8]];
+  const ordered = orderCorners(corners, 2000, 500);
+  assertCornersClose(
+    ordered,
+    [[0.6, 0.2], [0.6, 0.8], [0.4, 0.8], [0.4, 0.2]],
+    'original-space shortest edge',
+  );
+});
+
+await test('rotates shortest edge to top from any side', () => {
+  const corners = [[0.0, 0.0], [0.8, 0.0], [0.7, 0.8], [0.0, 0.8]];
+  const ordered = orderCorners(corners, 1000, 1000);
+  assertCornersClose(
+    ordered,
+    [[0.7, 0.8], [0.0, 0.8], [0.0, 0.0], [0.8, 0.0]],
+    'shortest edge from any side',
+  );
 });
 
 // ---------------------------------------------------------------------------

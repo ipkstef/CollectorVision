@@ -44,11 +44,20 @@ def _preprocess(bgr: np.ndarray, size: int) -> np.ndarray:
     return x.transpose(2, 0, 1)[np.newaxis].astype(np.float32)  # (1,3,H,W)
 
 
-def _order_corners(pts: np.ndarray) -> np.ndarray:
+def _orient_shortest_edge_top(corners: np.ndarray, image_shape: tuple[int, ...]) -> np.ndarray:
+    """Rotate corner order so the shortest original-space edge becomes the dewarped top."""
+    h, w = image_shape[:2]
+    pixel_corners = corners * np.array([w, h], dtype=np.float32)
+    edge_lengths = np.linalg.norm(pixel_corners - np.roll(pixel_corners, -1, axis=0), axis=1)
+    shortest_edge = int(np.argmin(edge_lengths))
+    return np.roll(corners, -shortest_edge, axis=0)
+
+
+def _order_corners(pts: np.ndarray, image_shape: tuple[int, ...] | None = None) -> np.ndarray:
     """Reorder four (x,y) points to canonical TL, TR, BR, BL order."""
     s = pts.sum(axis=1)
     d = np.diff(pts, axis=1).ravel()
-    return np.array(
+    ordered = np.array(
         [
             pts[np.argmin(s)],  # TL: smallest x+y
             pts[np.argmin(d)],  # TR: smallest x-y
@@ -57,6 +66,9 @@ def _order_corners(pts: np.ndarray) -> np.ndarray:
         ],
         dtype=np.float32,
     )
+    if image_shape is not None:
+        ordered = _orient_shortest_edge_top(ordered, image_shape)
+    return ordered
 
 
 class NeuralCornerDetector:
@@ -153,7 +165,7 @@ class NeuralCornerDetector:
             card_present = presence >= self._presence_threshold
             confidence = presence
 
-        corners = _order_corners(corners_flat.reshape(4, 2).astype(np.float32))
+        corners = _order_corners(corners_flat.reshape(4, 2).astype(np.float32), image.shape)
 
         return DetectionResult(
             corners=corners,
