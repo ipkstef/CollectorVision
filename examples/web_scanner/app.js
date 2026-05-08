@@ -23,6 +23,7 @@ const MATCH_SCORE_KEY = "cv_min_match_score";
 const ROTATION_INVARIANT_KEY = "cv_rotation_invariant_enabled";
 const MIN_MATCHES_DEFAULT = 2;
 const MATCHES_KEY = "cv_min_matches";
+const SCAN_BUFFER_SIZE = 5;
 const SCANS_KEY = "cv_scans";
 const PERF_OVERLAY_KEY = "cv_perf_overlay_enabled";
 const DEBUG_MODE = new URLSearchParams(location.search).get("debug") === "1";
@@ -832,10 +833,10 @@ function setupCaptureButton(camera, captureState) {
 }
 
 class ScanBucket {
-  constructor(fillAt = 2, cooldownMs = 3500) {
-    this.fillAt = fillAt;
+  constructor(windowSize = SCAN_BUFFER_SIZE, cooldownMs = 3500) {
+    this.windowSize = windowSize;
     this.cooldownMs = cooldownMs;
-    this.candidate = null;
+    this.records = [];
     this.cooldowns = new Map();
   }
 
@@ -847,40 +848,28 @@ class ScanBucket {
       }
     }
 
-    if (!rec) {
-      if (this.candidate) {
-        this.candidate.count = Math.max(0, this.candidate.count - 1);
-        if (this.candidate.count === 0) {
-          this.candidate = null;
-        }
-      }
+    const entry = rec && !this.cooldowns.has(rec.cardId) ? { ...rec, at: now } : null;
+    this.records.push(entry);
+    if (this.records.length > this.windowSize) {
+      this.records.shift();
+    }
+
+    if (!entry) {
       return null;
     }
 
-    if (this.cooldowns.has(rec.cardId)) {
+    const matches = this.records.filter((record) => record?.cardId === entry.cardId);
+    if (matches.length < getMinMatches()) {
       return null;
     }
 
-    if (this.candidate?.cardId === rec.cardId) {
-      this.candidate.count += 1;
-      this.candidate.rec = rec;
-      if (this.candidate.count >= getMinMatches()) {
-        const confirmed = this.candidate.rec;
-        this.cooldowns.set(rec.cardId, now + this.cooldownMs);
-        this.candidate = null;
-        return confirmed;
-      }
-      return null;
-    }
-
-    this.candidate = { cardId: rec.cardId, count: 1, rec };
-    if (this.candidate.count >= getMinMatches()) {
-      const confirmed = this.candidate.rec;
-      this.cooldowns.set(rec.cardId, now + this.cooldownMs);
-      this.candidate = null;
-      return confirmed;
-    }
-    return null;
+    const confirmed = matches.reduce(
+      (best, record) => (record.score > best.score ? record : best),
+      matches[0],
+    );
+    this.cooldowns.set(entry.cardId, now + this.cooldownMs);
+    this.records = [];
+    return confirmed;
   }
 }
 
@@ -1855,7 +1844,11 @@ function createScannerLoop(
       return;
     }
 
-    const confirmed = bucket.push({ cardId: data.cardId, score: data.score });
+    const confirmed = bucket.push({
+      cardId: data.cardId,
+      score: data.score,
+      orientation: data.orientation,
+    });
     if (!confirmed) {
       return;
     }

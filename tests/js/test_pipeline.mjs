@@ -124,6 +124,47 @@ function chooseBetterMatch(current, candidate) {
   return candidate.score > current.score ? candidate : current;
 }
 
+class ScanBucket {
+  constructor(minMatches = 2, windowSize = 5, cooldownMs = 3500) {
+    this.minMatches = minMatches;
+    this.windowSize = windowSize;
+    this.cooldownMs = cooldownMs;
+    this.records = [];
+    this.cooldowns = new Map();
+  }
+
+  push(rec, now = Date.now()) {
+    for (const [id, expiry] of this.cooldowns) {
+      if (now >= expiry) {
+        this.cooldowns.delete(id);
+      }
+    }
+
+    const entry = rec && !this.cooldowns.has(rec.cardId) ? { ...rec, at: now } : null;
+    this.records.push(entry);
+    if (this.records.length > this.windowSize) {
+      this.records.shift();
+    }
+
+    if (!entry) {
+      return null;
+    }
+
+    const matches = this.records.filter((record) => record?.cardId === entry.cardId);
+    if (matches.length < this.minMatches) {
+      return null;
+    }
+
+    const confirmed = matches.reduce(
+      (best, record) => (record.score > best.score ? record : best),
+      matches[0],
+    );
+    this.cooldowns.set(entry.cardId, now + this.cooldownMs);
+    this.records = [];
+    return confirmed;
+  }
+}
+
 function solveLinearSystem(matrix, vector) {
   const size = vector.length;
   const a = matrix.map((row, index) => [...row, vector[index]]);
@@ -342,6 +383,22 @@ await test('keeps the stronger orientation match', () => {
   const best = chooseBetterMatch(upright, rotated);
   assert(best.cardId === 'rotated-card', `Expected rotated-card, got ${best.cardId}`);
   assert(best.orientation === 'rotated_180', `Expected rotated_180, got ${best.orientation}`);
+});
+
+await test('rolling scan buffer confirms non-consecutive matches', () => {
+  const bucket = new ScanBucket(2, 5);
+  assert(bucket.push({ cardId: 'card-a', score: 0.72 }, 1000) === null);
+  assert(bucket.push(null, 1100) === null);
+  const confirmed = bucket.push({ cardId: 'card-a', score: 0.74 }, 1200);
+  assert(confirmed?.cardId === 'card-a', `Expected card-a, got ${confirmed?.cardId}`);
+});
+
+await test('rolling scan buffer groups rotated and upright hits by card', () => {
+  const bucket = new ScanBucket(2, 5);
+  assert(bucket.push({ cardId: 'card-a', score: 0.71, orientation: 'upright' }, 2000) === null);
+  const confirmed = bucket.push({ cardId: 'card-a', score: 0.88, orientation: 'rotated_180' }, 2100);
+  assert(confirmed?.cardId === 'card-a', `Expected card-a, got ${confirmed?.cardId}`);
+  assert(confirmed?.orientation === 'rotated_180', `Expected rotated_180, got ${confirmed?.orientation}`);
 });
 
 // ---------------------------------------------------------------------------
