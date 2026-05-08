@@ -20,6 +20,7 @@ const ASSET_DB_NAME = "collectorvision-web-scanner";
 const ASSET_STORE_NAME = "assets";
 const WEBGPU_PREF_KEY = "cv_webgpu_enabled";
 const MATCH_SCORE_KEY = "cv_min_match_score";
+const ROTATION_INVARIANT_KEY = "cv_rotation_invariant_enabled";
 const MIN_MATCHES_DEFAULT = 2;
 const MATCHES_KEY = "cv_min_matches";
 const SCANS_KEY = "cv_scans";
@@ -769,6 +770,7 @@ function setupCaptureButton(camera, captureState) {
           // embedding divergence between JS (WebGPU/WASM) and Python (CPU ONNX).
           jsCardId: data.cardId ?? null,
           jsScore: data.score ?? null,
+          jsOrientation: data.orientation ?? null,
           timing: data.timing ?? null,
           crossOriginIsolated: self.crossOriginIsolated ?? false,
           numThreads: captureState.numThreads ?? null,
@@ -1468,6 +1470,10 @@ function getMinMatches() {
   return Number.isFinite(stored) && stored >= 1 ? stored : MIN_MATCHES_DEFAULT;
 }
 
+function isRotationInvariantEnabled() {
+  return localStorage.getItem(ROTATION_INVARIANT_KEY) !== "false";
+}
+
 function setupMatchScoreSlider() {
   const slider = document.getElementById("match-score-slider");
   const label = document.getElementById("match-score-value");
@@ -1495,6 +1501,17 @@ function setupMinMatchesSlider() {
     const value = parseInt(slider.value, 10);
     label.textContent = value;
     localStorage.setItem(MATCHES_KEY, value);
+  });
+}
+
+function setupRotationInvariantToggle() {
+  const checkbox = document.getElementById("rotation-invariant-toggle");
+  if (!checkbox) return;
+
+  checkbox.checked = isRotationInvariantEnabled();
+  checkbox.addEventListener("change", () => {
+    localStorage.setItem(ROTATION_INVARIANT_KEY, checkbox.checked ? "true" : "false");
+    location.reload();
   });
 }
 
@@ -1549,12 +1566,13 @@ class PerformanceOverlay {
     const resultGap = data?.resultGapMs ? formatMs(data.resultGapMs) : "—";
     const score = Number.isFinite(data?.score) ? data.score.toFixed(3) : "—";
     const card = data?.cardPresent ? (data.cornersValid ? "card" : "bad-quad") : "no-card";
+    const orientation = data?.orientation ? `  ${data.orientation}` : "";
     this.el.textContent = [
       `scan ${SCAN_INTERVAL_MS}ms  result ${resultGap}`,
       `total ${formatMs(timing.totalMs)}  det ${formatMs(timing.detectMs)} (run ${formatMs(timing.detectorRunMs)})`,
       `dew ${formatMs(timing.dewarpMs)} (warp ${formatMs(timing.dewarpWarpMs)})  emb ${formatMs(timing.embedMs)} (run ${formatMs(timing.embedRunMs)})`,
       `prep det ${formatMs(timing.detectorInputMs)}  prep emb ${formatMs(timing.embedInputMs)}  lookup ${formatMs(timing.searchMs)}`,
-      `${mode}  threads ${threads}  ${card}  score ${score}`,
+      `${mode}  threads ${threads}  ${card}  score ${score}${orientation}`,
       `${this.memoryLine()}  catalog ${formatMiB(this.catalogBytes)}`,
     ].join("\n");
   }
@@ -1770,6 +1788,7 @@ function createScannerLoop(
       cardPresent: data.cardPresent,
       cornersValid: data.cornersValid,
       score: data.score,
+      orientation: data.orientation,
       timing: data.timing,
     }, { debugOnly: true });
     perfOverlay?.update(data);
@@ -1807,7 +1826,8 @@ function createScannerLoop(
 
     if (data.timing) {
       const t = data.timing;
-      diag.set("diag-timing", `${t.totalMs}ms  (det ${t.detectMs}/run ${t.detectorRunMs} + dew ${t.dewarpMs}/warp ${t.dewarpWarpMs} + emb ${t.embedMs}/run ${t.embedRunMs} + search ${t.searchMs})`);
+      const orientation = data.orientation ? ` ${data.orientation}` : "";
+      diag.set("diag-timing", `${t.totalMs}ms${orientation}  (det ${t.detectMs}/run ${t.detectorRunMs} + dew ${t.dewarpMs}/warp ${t.dewarpWarpMs} + emb ${t.embedMs}/run ${t.embedRunMs} + search ${t.searchMs})`);
     }
 
     if (!data.cardPresent) {
@@ -1963,6 +1983,7 @@ async function boot() {
   setupWebGpuToggle();
   setupMatchScoreSlider();
   setupMinMatchesSlider();
+  setupRotationInvariantToggle();
   setupViewToggle();
   setupActions(scans);
   audioBus.preload();
@@ -2076,8 +2097,18 @@ async function boot() {
   loadingScreen.step("catalog", "active", "Queued");
   setText("models-status", "Loading models");
 
-  scannerWorker.postMessage({ type: "init", manifest, enableWebGpu: isWebGpuEnabled(), catalogLimit });
-  recordBootTrace("worker:init-posted", { enableWebGpu: isWebGpuEnabled(), catalogLimit });
+  scannerWorker.postMessage({
+    type: "init",
+    manifest,
+    enableWebGpu: isWebGpuEnabled(),
+    catalogLimit,
+    rotationInvariant: isRotationInvariantEnabled(),
+  });
+  recordBootTrace("worker:init-posted", {
+    enableWebGpu: isWebGpuEnabled(),
+    catalogLimit,
+    rotationInvariant: isRotationInvariantEnabled(),
+  });
   const { inferenceMode, numThreads, catalogRows, catalogTotalRows, catalogLimit: activeCatalogLimit } = await scannerReady;
 
   const threadLabel = self.crossOriginIsolated

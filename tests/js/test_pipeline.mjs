@@ -120,6 +120,10 @@ function orderCorners(points, width = null, height = null) {
 
 function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
 
+function chooseBetterMatch(current, candidate) {
+  return candidate.score > current.score ? candidate : current;
+}
+
 function solveLinearSystem(matrix, vector) {
   const size = vector.length;
   const a = matrix.map((row, index) => [...row, vector[index]]);
@@ -330,6 +334,14 @@ await test('rotates shortest edge to top from any side', () => {
     [[0.7, 0.8], [0.0, 0.8], [0.0, 0.0], [0.8, 0.0]],
     'shortest edge from any side',
   );
+});
+
+await test('keeps the stronger orientation match', () => {
+  const upright = { cardId: 'upright-card', score: 0.70, orientation: 'upright' };
+  const rotated = { cardId: 'rotated-card', score: 0.92, orientation: 'rotated_180' };
+  const best = chooseBetterMatch(upright, rotated);
+  assert(best.cardId === 'rotated-card', `Expected rotated-card, got ${best.cardId}`);
+  assert(best.orientation === 'rotated_180', `Expected rotated_180, got ${best.orientation}`);
 });
 
 // ---------------------------------------------------------------------------

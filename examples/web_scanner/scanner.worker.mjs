@@ -231,6 +231,10 @@ function normalizeEmbedding(embedding) {
   return embedding;
 }
 
+function chooseBetterMatch(current, candidate) {
+  return candidate.score > current.score ? candidate : current;
+}
+
 // ---------------------------------------------------------------------------
 // Float16 / catalog decode
 // ---------------------------------------------------------------------------
@@ -457,9 +461,10 @@ function isIOS() {
 // ---------------------------------------------------------------------------
 
 class WorkerRuntime {
-  constructor(manifest, useWebGpu = false, catalogLimit = null) {
+  constructor(manifest, useWebGpu = false, catalogLimit = null, rotationInvariant = true) {
     this.manifest = manifest;
     this.useWebGpu = useWebGpu;
+    this.rotationInvariant = rotationInvariant;
     this.catalogLimit = Number.isFinite(catalogLimit) && catalogLimit > 0
       ? Math.floor(catalogLimit)
       : null;
@@ -676,9 +681,16 @@ class WorkerRuntime {
     return this.dewarpCanvas;
   }
 
-  async embed(cropCanvas) {
+  async embed(cropCanvas, rotate180 = false) {
     const t0 = performance.now();
+    this.embedderScratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.embedderScratchCtx.clearRect(0, 0, EMBEDDER_SIZE, EMBEDDER_SIZE);
+    if (rotate180) {
+      this.embedderScratchCtx.translate(EMBEDDER_SIZE, EMBEDDER_SIZE);
+      this.embedderScratchCtx.rotate(Math.PI);
+    }
     this.embedderScratchCtx.drawImage(cropCanvas, 0, 0, EMBEDDER_SIZE, EMBEDDER_SIZE);
+    this.embedderScratchCtx.setTransform(1, 0, 0, 1, 0, 0);
     const t1 = performance.now();
     const input = fillInputTensorFromContext(
       this.embedderScratchCtx,
@@ -702,6 +714,25 @@ class WorkerRuntime {
         embedMs: t4 - t0,
       },
     };
+  }
+
+  async identify(cropCanvas) {
+    const upright = await this.embed(cropCanvas);
+    const tSearchStart = performance.now();
+    let best = { ...this.search(upright.embedding), orientation: "upright" };
+    let searchMs = performance.now() - tSearchStart;
+    let timing = upright.timing;
+
+    if (this.rotationInvariant) {
+      const rotated = await this.embed(cropCanvas, true);
+      const tRotatedSearchStart = performance.now();
+      const rotatedBest = { ...this.search(rotated.embedding), orientation: "rotated_180" };
+      searchMs += performance.now() - tRotatedSearchStart;
+      timing = sumTiming(timing, rotated.timing);
+      best = chooseBetterMatch(best, rotatedBest);
+    }
+
+    return { best, timing, searchMs };
   }
 
   search(query) {
@@ -819,10 +850,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
   }
 
   const cropCanvas = runtime.dewarp(frameCanvas, detection.corners);
-  const { embedding, timing: embedTiming } = await runtime.embed(cropCanvas);
-  const tSearchStart = performance.now();
-  const best = runtime.search(embedding);
-  const tSearchEnd = performance.now();
+  const { best, timing: embedTiming, searchMs } = await runtime.identify(cropCanvas);
 
   // Transfer the dewarp canvas bitmap (zero-copy) then it gets a fresh blank.
   const cropBitmap = includeDebugBitmaps ? cropCanvas.transferToImageBitmap() : null;
@@ -842,6 +870,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
     confidence: detection.confidence,
     cardId: best.cardId,
     score: best.score,
+    orientation: best.orientation,
     rawCorners: runtime._lastRawCorners,
     detectorInput: runtime._lastDetectorInput,
     detectorBitmap,
@@ -850,10 +879,17 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
       ...baseTiming,
       ...runtime._lastDewarpTiming,
       ...embedTiming,
-      searchMs: tSearchEnd - tSearchStart,
-      totalMs: tSearchEnd - tFrameStart,
+      searchMs,
+      totalMs: performance.now() - tFrameStart,
     }),
   }, transfer2);
+}
+
+function sumTiming(first, second) {
+  const keys = new Set([...Object.keys(first), ...Object.keys(second)]);
+  return Object.fromEntries(
+    [...keys].map((key) => [key, (first[key] ?? 0) + (second[key] ?? 0)]),
+  );
 }
 
 function roundTiming(timing) {
@@ -880,7 +916,12 @@ self.onmessage = async ({ data }) => {
       const catalogLimit = Number.isFinite(data.catalogLimit) && data.catalogLimit > 0
         ? Math.floor(data.catalogLimit)
         : null;
-      runtime = new WorkerRuntime(data.manifest, useWebGpu, catalogLimit);
+      runtime = new WorkerRuntime(
+        data.manifest,
+        useWebGpu,
+        catalogLimit,
+        data.rotationInvariant !== false,
+      );
       await runtime.load((stage, ratio, loaded, total, cached) => {
         self.postMessage({ type: "progress", stage, ratio, loaded, total, cached });
       });

@@ -35,8 +35,10 @@ Pipeline:
 1. `getUserMedia()` captures a frame from the back camera.
 2. Cornelius predicts normalized card corners.
 3. Local JS dewarp warps directly into Milo's `448x448` input crop.
-4. Milo emits a `128`-d embedding.
-5. Browser code runs cosine search against a local embedding gallery.
+4. Milo emits a `128`-d embedding for the upright crop and, when enabled,
+   a second embedding for a 180-degree rotated crop.
+5. Browser code runs cosine search against a local embedding gallery and keeps
+   the orientation with the strongest top match.
 6. The winning `card_id` is enriched with static metadata and optional live
    Scryfall data.
 7. The confirmed card is appended to the running list and later exported as
