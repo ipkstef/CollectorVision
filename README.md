@@ -2,7 +2,7 @@
 
 Card identification library for collectible card games. Feed it a photo, get back a card identity.
 
-Supports Magic: The Gathering today. Pokémon, Yu-Gi-Oh, and others are planned.
+Magic: The Gathering is the primary supported catalog today. Additional non-MTG catalogs are available as highly experimental previews, and user feedback is welcome.
 
 ## Try online
 
@@ -49,7 +49,7 @@ The full pipeline runs end-to-end in under 100ms on a laptop CPU.
 import cv2
 import collector_vision as cvg
 
-# Load catalog (downloads ~29 MB on first run, cached locally after that)
+# Load catalog (downloads ~53 MB on first run, cached locally after that)
 catalog = cvg.Catalog.load("hf://HanClinto/milo/scryfall-mtg")
 
 # 1. Detect card corners
@@ -74,15 +74,15 @@ print(card_id, score)   # "abc123-...", 0.94
 
 Catalog files are simple NumPy archives containing card IDs and their corresponding reference embeddings (image "fingerprints").
 
-Build your own catalog of IDs + reference images, or use our pre-build catalog files available at [HuggingFace](https://huggingface.co/HanClinto/milo/tree/main/catalogs).
+[Build your own catalog](catalog) of IDs + reference images, or use our pre-built catalog files available at [Hugging Face](https://huggingface.co/HanClinto/milo/tree/main/catalogs).
 
 Pass a local path and nothing touches the network:
 
 ```python
-catalog = cvg.Catalog.load("./milo1-scryfall-mtg-2026-04.npz")
+catalog = cvg.Catalog.load("./milo1-scryfall-mtg-2026-05-07.npz")
 ```
 
-Or point at our HuggingFace repository and always download the latest: 
+Or point at our Hugging Face repository and always download the latest: 
 
 ```python
 catalog = cvg.Catalog.load("hf://HanClinto/milo/scryfall-mtg")
@@ -130,15 +130,26 @@ hits = catalog.search(emb)
 
 ## Available catalogs
 
-| Game | Source | Catalog key | Size |
-|---|---|---|---|
-| Magic: The Gathering | Scryfall | `scryfall-mtg` | ~29 MB |
+All catalogs below are official snapshots from the CollectorVision Hugging Face repository. Magic: The Gathering catalogs are the primary supported path; all non-MTG catalogs are highly experimental and need user feedback from real-world scans.
+
+| Game | Source | Catalog key | Description | Size |
+|---|---|---|---|---|
+| Magic: The Gathering | Scryfall | `scryfall-mtg` | Primary MTG catalog from Scryfall reference images and card IDs. | ~53 MB |
+| Magic: The Gathering | Scryfall | `scryfall-mtg-es` | Experimental Spanish-language MTG catalog from Scryfall; Milo has not been trained to distinguish English vs. Spanish printings. | ~21 MB |
+| Magic: The Gathering | TCGplayer | `tcgplayer-mtg` | MTG catalog built from TCGplayer product/reference images. | ~50 MB |
+| Digimon Card Game | TCGplayer | `tcgplayer-digimon` | Highly experimental Digimon catalog; feedback wanted. | ~3.9 MB |
+| Flesh and Blood | TCGplayer | `tcgplayer-fab` | Highly experimental Flesh and Blood catalog; feedback wanted. | ~4.3 MB |
+| Disney Lorcana | TCGplayer | `tcgplayer-lorcana` | Highly experimental Lorcana catalog; feedback wanted. | ~1.3 MB |
+| One Piece Card Game | TCGplayer | `tcgplayer-onepiece` | Highly experimental One Piece catalog; feedback wanted. | ~3.0 MB |
+| Pokémon TCG | TCGplayer | `tcgplayer-pokemon` | Highly experimental Pokémon catalog; feedback wanted. | ~13 MB |
+| Star Wars: Unlimited | TCGplayer | `tcgplayer-swu` | Highly experimental Star Wars: Unlimited catalog; feedback wanted. | ~3.2 MB |
+| Yu-Gi-Oh! | TCGplayer | `tcgplayer-yugioh` | Highly experimental Yu-Gi-Oh! catalog; feedback wanted. | ~21 MB |
 
 Browse at **https://huggingface.co/HanClinto/milo/tree/main/catalogs**
 
-Catalogs are updated monthly. Filename format: `{algo}-{source}-{game}-{YYYY-MM}.npz`
+Catalogs are published as dated snapshots. Filename format: `{algo}-{source}-{game}-{YYYY-MM-DD}.npz`
 
-Other games and sources coming soon. To request a specific game/source, open an issue or reach out on Twitter @HanClinto.
+To share results, request a specific game/source, or report a catalog issue, open an issue or reach out on Twitter @HanClinto.
 
 ---
 
