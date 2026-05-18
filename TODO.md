@@ -305,6 +305,21 @@ GET /catalogs    — lists loaded catalog names
 
 ---
 
+## 15. Multi-card and binder-page scanning
+
+Tracked from [GitHub issue #18](https://github.com/HanClinto/CollectorVision/issues/18), which asks about scanning a binder page or several cards in one camera frame instead of scanning cards one at a time.
+
+Current behavior: the scanner can be used over a binder, but Cornelius currently tries to locate the single primary card in view. Multi-card detection would require broader detector work and additional UX decisions, so the next important piece is dataset collection before implementation.
+
+Action items:
+
+- [ ] **Next step: collect a realistic multi-card dataset.** @kapilt has the next responsibility here: provide sample binder-page captures that show the desired scanning workflow, preferably as a phone video flipping through binder pages. Other volunteers can help by contributing similar videos or still images from binders, play fields, and other multi-card layouts.
+- [ ] For each image or video segment, collect card IDs when practical. Scryfall IDs are preferred for MTG cards, but unlabeled media is still useful and can be annotated later.
+- [ ] Review the collected dataset and decide whether the first supported mode should be binder pages, play-field/live-stream recognition, or a smaller multi-card detector path.
+- [ ] Prototype multi-card detection after enough representative data exists, then evaluate complexity, performance, and scanner UI changes before adding it to the product backlog.
+
+---
+
 ## Milestone summary
 
 | Milestone | Status | Key items |

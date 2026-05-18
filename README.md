@@ -172,3 +172,18 @@ GitHub Pages deployment is wired to publish that folder directly from `main`.
 Once Pages is enabled for the repo, the scanner should be available at:
 
 `https://hanclinto.github.io/CollectorVision/`
+
+## Playground
+
+Demonstration:
+
+https://www.youtube.com/watch?v=MHieOcmC7Dw
+
+https://hanclinto.github.io/CollectorVision/applet_example.html
+
+
+## Discord
+
+Join our Discord to discuss all things CollectorVision, open-source, and computer vision:
+
+https://discord.gg/ds8SMCRFZp
