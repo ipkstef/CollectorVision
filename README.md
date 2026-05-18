@@ -88,6 +88,18 @@ Or point at our Hugging Face repository and always download the latest:
 catalog = cvg.Catalog.load("hf://HanClinto/milo/scryfall-mtg")
 ```
 
+To use another published catalog, change only the catalog key at the end of the URI. The rest of the pipeline stays the same:
+
+```python
+# Pokemon TCG
+catalog = cvg.Catalog.load("hf://HanClinto/milo/tcgplayer-pokemon")
+
+# Star Wars: Unlimited
+catalog = cvg.Catalog.load("hf://HanClinto/milo/tcgplayer-swu")
+```
+
+Returned `card_id` values come from the selected catalog's source. For example, TCGplayer catalogs return TCGplayer-style IDs rather than Scryfall UUIDs.
+
 Catalog files are cached locally after the first download, and update automatically when a new version is released. Default cache directory is `~/.cache/collectorvision/` but can be overridden with the `COLLECTORVISION_CACHE_DIR` environment variable.
 
 
