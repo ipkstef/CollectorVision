@@ -175,8 +175,9 @@ class QuickstartIntegrationTests(unittest.TestCase):
             Path("notes.txt"),
         ]
 
-        with mock.patch.object(Path, "is_dir", return_value=True), mock.patch.object(
-            Path, "iterdir", return_value=iter(files)
+        with (
+            mock.patch.object(Path, "is_dir", return_value=True),
+            mock.patch.object(Path, "iterdir", return_value=iter(files)),
         ):
             paths = module["image_paths"](Path("images"))
 
@@ -198,9 +199,12 @@ class QuickstartIntegrationTests(unittest.TestCase):
             return cache[card_id]
 
         output = io.StringIO()
-        with mock.patch.dict(
-            module["print_verbose_result"].__globals__, {"fetch_scryfall_card": fake_fetch}
-        ), contextlib.redirect_stdout(output):
+        with (
+            mock.patch.dict(
+                module["print_verbose_result"].__globals__, {"fetch_scryfall_card": fake_fetch}
+            ),
+            contextlib.redirect_stdout(output),
+        ):
             module["print_verbose_result"](
                 Path("expected-id_sample.jpg"), "expected-id", "matched-id", {}
             )
@@ -216,9 +220,7 @@ class QuickstartIntegrationTests(unittest.TestCase):
         )
 
         class FakeDetection:
-            corners = np.array(
-                [[0.1, 0.1], [0.8, 0.1], [0.8, 0.8], [0.1, 0.8]], dtype=np.float32
-            )
+            corners = np.array([[0.1, 0.1], [0.8, 0.1], [0.8, 0.8], [0.1, 0.8]], dtype=np.float32)
             card_present = True
             confidence = 0.91
             sharpness = 0.06

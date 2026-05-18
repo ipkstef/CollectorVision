@@ -228,9 +228,7 @@ def main() -> None:
         if args.debug:
             save_debug_artifacts(path, bgr, detection, args.debug_dir, crop=crop)
 
-        hits = search_hits(
-            catalog, crop, top_k=max_k, rot_invariant=args.rot_invariant
-        )
+        hits = search_hits(catalog, crop, top_k=max_k, rot_invariant=args.rot_invariant)
         if args.verbose:
             print_verbose_result(path, true_id, hits[0] if hits else None, metadata_cache)
 
