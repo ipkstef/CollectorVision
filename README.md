@@ -102,6 +102,30 @@ Returned `card_id` values come from the selected catalog's source. For example, 
 
 Catalog files are cached locally after the first download, and update automatically when a new version is released. Default cache directory is `~/.cache/collectorvision/` but can be overridden with the `COLLECTORVISION_CACHE_DIR` environment variable.
 
+---
+
+## Available catalogs
+
+All catalogs below are official snapshots from the CollectorVision Hugging Face repository. Magic: The Gathering catalogs are the primary supported path; all non-MTG catalogs are highly experimental and need user feedback from real-world scans.
+
+| Game | Source | Catalog key | Description | Size |
+|---|---|---|---|---|
+| Magic: The Gathering | Scryfall | `scryfall-mtg` | Primary MTG catalog from Scryfall reference images and card IDs. | ~53 MB |
+| Magic: The Gathering | Scryfall | `scryfall-mtg-es` | Experimental Spanish-language MTG catalog from Scryfall; Milo has not been trained to distinguish English vs. Spanish printings. | ~21 MB |
+| Magic: The Gathering | TCGplayer | `tcgplayer-mtg` | MTG catalog built from TCGplayer product/reference images. | ~50 MB |
+| Digimon Card Game | TCGplayer | `tcgplayer-digimon` | Highly experimental Digimon catalog; feedback wanted. | ~3.9 MB |
+| Flesh and Blood | TCGplayer | `tcgplayer-fab` | Highly experimental Flesh and Blood catalog; feedback wanted. | ~4.3 MB |
+| Disney Lorcana | TCGplayer | `tcgplayer-lorcana` | Highly experimental Lorcana catalog; feedback wanted. | ~1.3 MB |
+| One Piece Card Game | TCGplayer | `tcgplayer-onepiece` | Highly experimental One Piece catalog; feedback wanted. | ~3.0 MB |
+| Pokémon TCG | TCGplayer | `tcgplayer-pokemon` | Highly experimental Pokémon catalog; feedback wanted. | ~13 MB |
+| Star Wars: Unlimited | TCGplayer | `tcgplayer-swu` | Highly experimental Star Wars: Unlimited catalog; feedback wanted. | ~3.2 MB |
+| Yu-Gi-Oh! | TCGplayer | `tcgplayer-yugioh` | Highly experimental Yu-Gi-Oh! catalog; feedback wanted. | ~21 MB |
+
+Browse at **https://huggingface.co/HanClinto/milo/tree/main/catalogs**
+
+Catalogs are published as dated snapshots. Filename format: `{algo}-{source}-{game}-{YYYY-MM-DD}.npz`
+
+To share results, request a specific game/source, or report a catalog issue, open an issue or reach out on Twitter @HanClinto.
 
 ---
 
@@ -137,31 +161,6 @@ crop = Image.open("crop.jpg")
 emb = catalog.embedder.embed(crop)
 hits = catalog.search(emb)
 ```
-
----
-
-## Available catalogs
-
-All catalogs below are official snapshots from the CollectorVision Hugging Face repository. Magic: The Gathering catalogs are the primary supported path; all non-MTG catalogs are highly experimental and need user feedback from real-world scans.
-
-| Game | Source | Catalog key | Description | Size |
-|---|---|---|---|---|
-| Magic: The Gathering | Scryfall | `scryfall-mtg` | Primary MTG catalog from Scryfall reference images and card IDs. | ~53 MB |
-| Magic: The Gathering | Scryfall | `scryfall-mtg-es` | Experimental Spanish-language MTG catalog from Scryfall; Milo has not been trained to distinguish English vs. Spanish printings. | ~21 MB |
-| Magic: The Gathering | TCGplayer | `tcgplayer-mtg` | MTG catalog built from TCGplayer product/reference images. | ~50 MB |
-| Digimon Card Game | TCGplayer | `tcgplayer-digimon` | Highly experimental Digimon catalog; feedback wanted. | ~3.9 MB |
-| Flesh and Blood | TCGplayer | `tcgplayer-fab` | Highly experimental Flesh and Blood catalog; feedback wanted. | ~4.3 MB |
-| Disney Lorcana | TCGplayer | `tcgplayer-lorcana` | Highly experimental Lorcana catalog; feedback wanted. | ~1.3 MB |
-| One Piece Card Game | TCGplayer | `tcgplayer-onepiece` | Highly experimental One Piece catalog; feedback wanted. | ~3.0 MB |
-| Pokémon TCG | TCGplayer | `tcgplayer-pokemon` | Highly experimental Pokémon catalog; feedback wanted. | ~13 MB |
-| Star Wars: Unlimited | TCGplayer | `tcgplayer-swu` | Highly experimental Star Wars: Unlimited catalog; feedback wanted. | ~3.2 MB |
-| Yu-Gi-Oh! | TCGplayer | `tcgplayer-yugioh` | Highly experimental Yu-Gi-Oh! catalog; feedback wanted. | ~21 MB |
-
-Browse at **https://huggingface.co/HanClinto/milo/tree/main/catalogs**
-
-Catalogs are published as dated snapshots. Filename format: `{algo}-{source}-{game}-{YYYY-MM-DD}.npz`
-
-To share results, request a specific game/source, or report a catalog issue, open an issue or reach out on Twitter @HanClinto.
 
 ---
 
