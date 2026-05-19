@@ -70,19 +70,9 @@ print(card_id, score)   # "abc123-...", 0.94
 
 ---
 
-## Local catalog file
+## Available catalogs
 
-Catalog files are simple NumPy archives containing card IDs and their corresponding reference embeddings (image "fingerprints").
-
-[Build your own catalog](catalog) of IDs + reference images, or use our pre-built catalog files available at [Hugging Face](https://huggingface.co/HanClinto/milo/tree/main/catalogs).
-
-Pass a local path and nothing touches the network:
-
-```python
-catalog = cvg.Catalog.load("./milo1-scryfall-mtg-2026-05-07.npz")
-```
-
-Or point at our Hugging Face repository and always download the latest: 
+Catalogs are simple databases that include card embeddings (fingerprints) with keys (such as ScryFall IDs or TCGplayerIDs). You can [build your catalog yourself](catalog), or point at our HuggingFace repository and always download the official latest version: 
 
 ```python
 catalog = cvg.Catalog.load("hf://HanClinto/milo/scryfall-mtg")
@@ -101,10 +91,6 @@ catalog = cvg.Catalog.load("hf://HanClinto/milo/tcgplayer-swu")
 Returned `card_id` values come from the selected catalog's source. For example, TCGplayer catalogs return TCGplayer-style IDs rather than Scryfall UUIDs.
 
 Catalog files are cached locally after the first download, and update automatically when a new version is released. Default cache directory is `~/.cache/collectorvision/` but can be overridden with the `COLLECTORVISION_CACHE_DIR` environment variable.
-
----
-
-## Available catalogs
 
 All catalogs below are official snapshots from the CollectorVision Hugging Face repository. Magic: The Gathering catalogs are the primary supported path; all non-MTG catalogs are highly experimental and need user feedback from real-world scans.
 
@@ -125,7 +111,21 @@ Browse at **https://huggingface.co/HanClinto/milo/tree/main/catalogs**
 
 Catalogs are published as dated snapshots. Filename format: `{algo}-{source}-{game}-{YYYY-MM-DD}.npz`
 
-To share results, request a specific game/source, or report a catalog issue, open an issue or reach out on Twitter @HanClinto.
+To share results, request a specific game/source, or report a catalog issue, open an issue or reach out [on Discord](https://discord.gg/ds8SMCRFZp) or [Twitter @HanClinto](https://x.com/HanClinto).
+
+---
+
+## Local catalog file
+
+Catalog files are simple NumPy archives containing card IDs and their corresponding reference embeddings (image "fingerprints").
+
+[Build your own catalog](catalog) of IDs + reference images, or use our pre-built catalog files available at [Hugging Face](https://huggingface.co/HanClinto/milo/tree/main/catalogs).
+
+Pass a local path and nothing touches the network:
+
+```python
+catalog = cvg.Catalog.load("./milo1-scryfall-mtg-2026-05-07.npz")
+```
 
 ---
 
